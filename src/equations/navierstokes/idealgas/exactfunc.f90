@@ -100,10 +100,10 @@ CALL prms%CreateRealOption(         'HarmonicFrequency',       "Harmonic Gauss P
 CALL prms%CreateRealOption(         'SigmaSqr',                "Harmonic Gauss Pulse CASE(14)", '0.1')
 
 !### Harmonic forcing with BC (Brunner)
-CALL prms%CreateRealOption(         'HarmonicFrequency_BC',         "Harmonic BC Forcing CASE(156)", '1000.0') ! in Hz
-CALL prms%CreateRealOption(         'PressureAmplitude',           "Harmonic BC Forcing CASE(156)", '1000.0') ! in Pa
-CALL prms%CreateRealOption(         'DensityAmbient',             "Harmonic BC Forcing CASE(156)", '1.0') ! in kg/m^3
-CALL prms%CreateRealOption(         'PressureAmbient',            "Harmonic BC Forcing CASE(156)", '100000.0') ! in Pa
+CALL prms%CreateRealOption(         'HarmonicFrequency_BC',         "Harmonic BC Forcing CASE(156/157)", '1000.0') ! in Hz
+CALL prms%CreateRealOption(         'PressureAmplitude',           "Harmonic BC Forcing CASE(156/157)", '1000.0') ! in Pa
+CALL prms%CreateRealOption(         'DensityAmbient',             "Harmonic BC Forcing CASE(156/157)", '1.0') ! in kg/m^3
+CALL prms%CreateRealOption(         'PressureAmbient',            "Harmonic BC Forcing CASE(156/157)", '100000.0') ! in Pa
 
 #if PARABOLIC
 CALL prms%CreateRealOption(         'delta99_in',              "Blasius boundary layer CASE(1338)")
@@ -176,6 +176,12 @@ CASE(155) ! harmonic forcing (Brunner)
     SiqmaSqr          = GETREAL('SigmaSqr')
 
 CASE(156) ! harmonic BC forcing (Brunner)
+    HarmonicFrequency_BC = GETREAL('HarmonicFrequency_BC')
+    PressureAmplitude    = GETREAL('PressureAmplitude')
+    DensityAmbient       = GETREAL('DensityAmbient')
+    PressureAmbient      = GETREAL('PressureAmbient')
+
+CASE(157) ! harmonic BC forcing second variant (Brunner)
     HarmonicFrequency_BC = GETREAL('HarmonicFrequency_BC')
     PressureAmplitude    = GETREAL('PressureAmplitude')
     DensityAmbient       = GETREAL('DensityAmbient')
@@ -260,7 +266,8 @@ REAL                            :: du, dTemp, RT, r2       ! aux var for SHU VOR
 REAL                            :: pi_loc,phi,radius       ! needed for cylinder potential flow
 REAL                            :: h,sRT,pexit,pentry   ! needed for Couette-Poiseuille
 ! needed for harmonic BC forcing (Brunner)
-REAL                            :: Density_Ambient, Pressure_Ambient, Density_Amplitude, Pressure_Amplitude
+REAL                            :: DensityAmbient, PressureAmbient, DensityAmplitude, PressureAmplitude
+REAL                            :: c, gamma, Density, pprime, pressure, rhoprime, Temperature, un_prime, P_by_P0, HarmonicFrequency_BC
 #if PARABOLIC
 ! needed for blasius BL
 INTEGER                         :: nSteps,i
@@ -670,6 +677,24 @@ CASE(156) ! plane wave excitation boundary condition
   prim(VEL3) = 0.0
   prim(TEMP) = prim(PRES) / (prim(DENS)*R)
   
+  CALL PrimToCons(prim,Resu)
+
+CASE(157) ! plane wave excitation boundary condition
+  R = 287.05 ! in J/(kg K)
+  Kappa = 1.4
+  Omega = 2.*PP_Pi*HarmonicFrequency_BC
+
+  Pressure = PressureAmbient + PressureAmplitude*SIN(Omega*tEval)
+  P_by_P0 = Pressure/PressureAmbient
+  Density = DensityAmbient*P_by_P0**(1./Kappa)
+  Temperature = Pressure/(Density*R)
+
+  prim = RefStatePrim(:,RefState)
+  prim(DENS) = Density
+  prim(PRES) = Pressure
+  prim(VEL1) = (Pressure-PressureAmbient)/(Density*SQRT(Kappa*R*Temperature))
+  prim(VEL2:VEL3) = 0.
+  prim(TEMP)=Temperature
   CALL PrimToCons(prim,Resu)
 !###
 
