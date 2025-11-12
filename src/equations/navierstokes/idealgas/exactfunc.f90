@@ -68,6 +68,13 @@ CALL addStrListEntry('IniExactFunc','shock'             ,10)
 CALL addStrListEntry('IniExactFunc','sod'               ,11)
 CALL addStrListEntry('IniExactFunc','dmr'               ,13)
 CALL addStrListEntry('IniExactFunc','harmonicgausspulse',14)
+
+!### Harmonic forcing with source term (Brunner)
+CALL addStrListEntry('IniExactFunc','harmonic_forcing_brunner'        ,155)
+!### Harmonic forcing of boundary condition (Brunner)
+CALL addStrListEntry('IniExactFunc','harmonic_bc_forcing_brunner'     ,156)
+!###
+
 CALL addStrListEntry('IniExactFunc','blast_shock'       ,111)
 CALL addStrListEntry('IniExactFunc','shockVortex'       ,15)
 #if PARABOLIC
@@ -154,6 +161,19 @@ SELECT CASE (IniExactFunc)
     HarmonicFrequency = GETREAL('HarmonicFrequency')
     AmplitudeFactor   = GETREAL('AmplitudeFactor')
     SiqmaSqr          = GETREAL('SigmaSqr')
+
+!###
+CASE(155) ! harmonic forcing (Brunner)
+    HarmonicFrequency = GETREAL('HarmonicFrequency')
+    AmplitudeFactor   = GETREAL('AmplitudeFactor')
+    SiqmaSqr          = GETREAL('SigmaSqr')
+
+!CASE(156) ! harmonic BC forcing (Brunner)
+!    HarmonicFrequency = GETREAL('HarmonicFrequency')
+!    AmplitudeFactor   = GETREAL('AmplitudeFactor')
+!    SiqmaSqr          = GETREAL('SigmaSqr')
+!###
+
   CASE(15) ! shock-vortex
     MachShock        = GETREAL('MachShock','1.1')
 #if PARABOLIC
@@ -231,6 +251,8 @@ REAL                            :: random
 REAL                            :: du, dTemp, RT, r2       ! aux var for SHU VORTEX,isentropic vortex case 12
 REAL                            :: pi_loc,phi,radius       ! needed for cylinder potential flow
 REAL                            :: h,sRT,pexit,pentry   ! needed for Couette-Poiseuille
+! needed for harmonic BC forcing (Brunner)
+REAL                            :: Density_Ambient, Pressure_Ambient, Density_Amplitude, Pressure_Amplitude
 #if PARABOLIC
 ! needed for blasius BL
 INTEGER                         :: nSteps,i
@@ -619,6 +641,26 @@ CASE(13) ! DoubleMachReflection (see e.g. http://www.astro.princeton.edu/~jstone
   CALL PrimToCons(prim,resu)
 CASE(14) ! harmonic gauss pulse
   Resu = RefStateCons(:,RefState)
+
+!###
+CASE(155) ! source term forcing (Brunner)
+  Resu = RefStateCons(:,RefState)
+
+CASE(156) ! plane wave excitation boundary condition
+  Frequency = 1000.0 ! in Hz
+  Pressure_Amplitude = 1000.0 ! in Pa
+  Density_Ambient = 1 ! in kg/m^3
+  Pressure_Ambient = 100000.0 ! in Pa
+  Density_Amplitude = Pressure_Amplitude/Pressure_Ambient
+  Omega = 2.*PP_Pi*Frequency
+  prim = RefStatePrim(:,RefState)
+  prim(DENS) = Density_Ambient + Density_Amplitude*SIN(Omega*tEval)
+  prim(PRES) = Pressure_Ambient + Pressure_Amplitude*SIN(Omega*tEval)
+  prim(VEL1:VEL3) = 0.
+  prim(TEMP)=prim(PRES)/(prim(DENS)*R)
+  CALL PrimToCons(prim,Resu)
+!###
+
 CASE(15) ! shock-vortex interaction
   ! Stationary shock with (default) M_s=1.1 at x=0.5, added isentropic vortex travelling from left to right
   ! Assumes R=1!!
@@ -824,6 +866,27 @@ CASE(14) ! Harmonic Gausspulse
         Ut(:,i,j,k,iElem) = Ut(:,i,j,k,iElem)+Ut_src(:,i,j,k)/sJ(i,j,k,iElem,0)
       END DO; END DO; END DO ! i,j,k
   END DO
+
+
+CASE(155) ! Source term forcing of Gaussian wavepacket with advection in x-direction with Gaussian timewindow
+  DO iElem=1,nElems
+    DO k=0,PP_NZ; DO j=0,PP_N; DO i=0,PP_N
+      !IF (Elem_xGP(1,i,j,k,iElem).GT.3.0) THEN
+      !  Ut_src(1,i,j,k) = 0.0
+      !  Ut_src(5,i,j,k) = 0.0
+      !ELSE
+      Ut_src(1,i,j,k) = 10*EXP(-1.0*(t-0.05)**2/(2*0.01**2))*EXP(-0.5*(Elem_xGP(1,i,j,k,iElem)+3.3)**2/(0.05**2))
+      Ut_src(5,i,j,k) = 100000.0*10*EXP(-1.0*(t-0.05)**2/(2*0.01**2))*EXP(-0.5*(Elem_xGP(1,i,j,k,iElem)+3.3)**2/(0.05**2))
+      !END IF
+      Ut_src(2:4,i,j,k) = 0.0
+    END DO; END DO; END DO ! i,j,k
+      DO k=0,PP_NZ; DO j=0,PP_N; DO i=0,PP_N
+        Ut(:,i,j,k,iElem) = Ut(:,i,j,k,iElem)+Ut_src(:,i,j,k)/sJ(i,j,k,iElem,0)
+      END DO; END DO; END DO ! i,j,k
+  END DO
+
+
+
 CASE(41) ! Sinus in x
   Frequency=IniFrequency
   Amplitude=IniAmplitude
