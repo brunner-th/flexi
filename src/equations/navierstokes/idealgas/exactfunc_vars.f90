@@ -42,6 +42,14 @@ REAL              :: SiqmaSqr          !< Sigma squared of the gaussian distribu
 REAL              :: JetRadius         !< parameter for Roundjet
 REAL              :: JetEnd            !< parameter for Roundjet
 REAL              :: JetAmplitude      !< parameter for amplitude (max velocity) of jet
+
+!### Harmonic forcing with BC (Brunner)
+REAL              :: HarmonicFrequency_BC
+REAL              :: PressureAmplitude
+REAL              :: DensityAmbient
+REAL              :: PressureAmbient
+!###
+
 LOGICAL           :: RoundJetInitDone=.FALSE.
 #if PARABOLIC
 REAL              :: delta99_in        !< boundary layer thickness for Blasius solution

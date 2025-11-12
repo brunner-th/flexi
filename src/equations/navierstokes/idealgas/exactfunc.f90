@@ -98,6 +98,13 @@ CALL prms%CreateRealOption(         'U_Parameter',  "Couette-Poiseuille flow CAS
 CALL prms%CreateRealOption(         'AmplitudeFactor',         "Harmonic Gauss Pulse CASE(14)", '0.1')
 CALL prms%CreateRealOption(         'HarmonicFrequency',       "Harmonic Gauss Pulse CASE(14)", '400')
 CALL prms%CreateRealOption(         'SigmaSqr',                "Harmonic Gauss Pulse CASE(14)", '0.1')
+
+!### Harmonic forcing with BC (Brunner)
+CALL prms%CreateRealOption(         'HarmonicFrequency_BC',         "Harmonic BC Forcing CASE(156)", '1000.0') ! in Hz
+CALL prms%CreateRealOption(         'PressureAmplitude',           "Harmonic BC Forcing CASE(156)", '1000.0') ! in Pa
+CALL prms%CreateRealOption(         'DensityAmbient',             "Harmonic BC Forcing CASE(156)", '1.0') ! in kg/m^3
+CALL prms%CreateRealOption(         'PressureAmbient',            "Harmonic BC Forcing CASE(156)", '100000.0') ! in Pa
+
 #if PARABOLIC
 CALL prms%CreateRealOption(         'delta99_in',              "Blasius boundary layer CASE(1338)")
 CALL prms%CreateRealArrayOption(    'x_in',                    "Blasius boundary layer CASE(1338)")
@@ -168,10 +175,11 @@ CASE(155) ! harmonic forcing (Brunner)
     AmplitudeFactor   = GETREAL('AmplitudeFactor')
     SiqmaSqr          = GETREAL('SigmaSqr')
 
-!CASE(156) ! harmonic BC forcing (Brunner)
-!    HarmonicFrequency = GETREAL('HarmonicFrequency')
-!    AmplitudeFactor   = GETREAL('AmplitudeFactor')
-!    SiqmaSqr          = GETREAL('SigmaSqr')
+CASE(156) ! harmonic BC forcing (Brunner)
+    HarmonicFrequency_BC = GETREAL('HarmonicFrequency_BC')
+    PressureAmplitude    = GETREAL('PressureAmplitude')
+    DensityAmbient       = GETREAL('DensityAmbient')
+    PressureAmbient      = GETREAL('PressureAmbient')
 !###
 
   CASE(15) ! shock-vortex
@@ -647,17 +655,21 @@ CASE(155) ! source term forcing (Brunner)
   Resu = RefStateCons(:,RefState)
 
 CASE(156) ! plane wave excitation boundary condition
-  Frequency = 1000.0 ! in Hz
-  Pressure_Amplitude = 1000.0 ! in Pa
-  Density_Ambient = 1 ! in kg/m^3
-  Pressure_Ambient = 100000.0 ! in Pa
-  Density_Amplitude = Pressure_Amplitude/Pressure_Ambient
-  Omega = 2.*PP_Pi*Frequency
+
+  Omega = 2.*PP_Pi*HarmonicFrequency_BC
+  c = SQRT(gamma*PressureAmbient/DensityAmbient)
+  pprime   = PressureAmplitude * SIN(Omega*tEval)
+  rhoprime = pprime / (c*c)
+  un_prime = pprime / (DensityAmbient*c)          
+
   prim = RefStatePrim(:,RefState)
-  prim(DENS) = Density_Ambient + Density_Amplitude*SIN(Omega*tEval)
-  prim(PRES) = Pressure_Ambient + Pressure_Amplitude*SIN(Omega*tEval)
-  prim(VEL1:VEL3) = 0.
-  prim(TEMP)=prim(PRES)/(prim(DENS)*R)
+  prim(PRES) = PressureAmbient + pprime
+  prim(DENS) = DensityAmbient + rhoprime
+  prim(VEL1) = un_prime
+  prim(VEL2) = 0.0
+  prim(VEL3) = 0.0
+  prim(TEMP) = prim(PRES) / (prim(DENS)*R)
+  
   CALL PrimToCons(prim,Resu)
 !###
 
